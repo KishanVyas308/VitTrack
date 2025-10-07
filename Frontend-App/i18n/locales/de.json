@@ -1,0 +1,41 @@
+{
+  "common": {
+    "cancel": "Abbrechen",
+    "save": "Speichern",
+    "delete": "Löschen",
+    "edit": "Bearbeiten",
+    "add": "Hinzufügen",
+    "search": "Suchen",
+    "filter": "Filter",
+    "close": "Schließen",
+    "confirm": "Bestätigen",
+    "loading": "Laden...",
+    "error": "Fehler",
+    "success": "Erfolg",
+    "apply": "Anwenden",
+    "reset": "Zurücksetzen"
+  },
+  "auth": {
+    "signIn": "Anmelden",
+    "signUp": "Registrieren",
+    "signOut": "Abmelden",
+    "email": "E-Mail",
+    "password": "Passwort",
+    "tagline": "Verwalten Sie Ihre Finanzen Intelligent"
+  },
+  "tabs": {
+    "home": "Startseite",
+    "transactions": "Transaktionen",
+    "analytics": "Analytik",
+    "profile": "Profil"
+  },
+  "categories": {
+    "food": "Essen und Gastronomie",
+    "transport": "Transport",
+    "shopping": "Einkaufen",
+    "bills": "Rechnungen und Versorgung",
+    "entertainment": "Unterhaltung",
+    "health": "Gesundheit und Fitness",
+    "education": "Bildung"
+  }
+}
