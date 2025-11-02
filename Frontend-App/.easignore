@@ -1,0 +1,9 @@
+# Ignore Backend folder when building with EAS
+../Backend/
+
+# Ignore node_modules from parent directory
+../node_modules/
+
+# Ignore other workspace folders if any
+../.git/
+../.github/
