@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Tabs } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, TouchableOpacity, View } from 'react-native';
 import Animated, {
@@ -12,16 +12,45 @@ import Animated, {
     withSpring,
 } from 'react-native-reanimated';
 import { VoiceInputModal } from '../../components/voice/VoiceInputModal';
+import { ExpenseReviewModal } from '../../components/voice/ExpenseReviewModal';
 import { useHaptics } from '../../hooks/useHaptics';
 import { useTheme } from '../../hooks/useTheme';
+import { useAuthStore } from '../../store/authStore';
+import { useTransactionStore } from '../../store/transactionStore';
+import { Transaction } from '../../types';
 
 export default function TabLayout() {
   const { t } = useTranslation();
   const { trigger } = useHaptics();
   const { colors } = useTheme();
+  const { user } = useAuthStore();
+  const { transactions, fetchTransactions } = useTransactionStore();
+  
   const [voiceModalVisible, setVoiceModalVisible] = useState(false);
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
+  const [pendingExpenses, setPendingExpenses] = useState<Transaction[]>([]);
+  const [lastTransactionCount, setLastTransactionCount] = useState(0);
 
   const pulseAnimation = useSharedValue(1);
+
+  // Detect new transactions from voice input
+  useEffect(() => {
+    // When voice modal opens, capture the current transaction count as baseline
+    if (voiceModalVisible) {
+      console.log('Voice modal opened, setting baseline count:', transactions.length);
+      setLastTransactionCount(transactions.length);
+      return;
+    }
+
+    // Check if new transactions were added (after voice modal closes)
+    if (transactions.length > lastTransactionCount && !voiceModalVisible) {
+      const newExpenses = transactions.slice(0, transactions.length - lastTransactionCount);
+      console.log('New expenses detected:', newExpenses.length, 'total:', transactions.length, 'baseline:', lastTransactionCount);
+      setPendingExpenses(newExpenses);
+      setReviewModalVisible(true);
+      setLastTransactionCount(transactions.length);
+    }
+  }, [transactions.length, lastTransactionCount, voiceModalVisible]);
 
   React.useEffect(() => {
     pulseAnimation.value = withRepeat(
@@ -33,6 +62,24 @@ export default function TabLayout() {
       false
     );
   }, []);
+
+  const handleVoiceComplete = async () => {
+    console.log('Voice modal closing, waiting for new expenses...');
+    setVoiceModalVisible(false);
+    // Transactions will be automatically detected by the useEffect above
+  };
+
+  const handleSaveEdits = async (updatedExpenses: Transaction[]) => {
+    console.log('Saving edited expenses:', updatedExpenses.length);
+    setReviewModalVisible(false);
+    setPendingExpenses([]);
+    
+    // Refresh to get updated data from backend
+    if (user?.id) {
+      console.log('Refreshing transactions after edit...');
+      await fetchTransactions(parseInt(user.id));
+    }
+  };
 
   const pulseStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulseAnimation.value }],
@@ -205,11 +252,18 @@ export default function TabLayout() {
 
       <VoiceInputModal
         visible={voiceModalVisible}
-        onClose={() => setVoiceModalVisible(false)}
-        onSave={(data) => {
-          setVoiceModalVisible(false);
-          // Handle save transaction
+        onClose={handleVoiceComplete}
+        onSave={handleVoiceComplete}
+      />
+
+      <ExpenseReviewModal
+        visible={reviewModalVisible}
+        expenses={pendingExpenses}
+        onClose={() => {
+          setReviewModalVisible(false);
+          setPendingExpenses([]);
         }}
+        onSave={handleSaveEdits}
       />
     </>
   );

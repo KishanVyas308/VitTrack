@@ -17,7 +17,7 @@ class Expense(ExpenseCreate):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class CategoryBase(BaseModel):
     name: str
@@ -26,7 +26,7 @@ class Category(CategoryBase):
     id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class UserBase(BaseModel):
     name: str = Field(..., min_length=2, max_length=50)
@@ -43,12 +43,19 @@ class UserBase(BaseModel):
                 raise ValueError("Invalid JSON syntax in field")
         return v
 
+class UserCreate(UserBase):
+    password: str = Field(..., min_length=6, description="Password must be at least 6 characters")
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
 class User(UserBase):
     id: int
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class UserSearchSchema(BaseModel):
     name: Optional[str] = None

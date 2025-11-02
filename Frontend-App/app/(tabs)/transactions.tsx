@@ -16,6 +16,7 @@ import { AddTransactionModal } from '../../components/transaction/AddTransaction
 import { useCurrency } from '../../hooks/useCurrency';
 import { useHaptics } from '../../hooks/useHaptics';
 import { useTheme } from '../../hooks/useTheme';
+import { useAuthStore } from '../../store/authStore';
 import { useTransactionStore } from '../../store/transactionStore';
 import { Transaction } from '../../types';
 
@@ -26,8 +27,9 @@ export default function TransactionsScreen() {
   const { trigger } = useHaptics();
   const { formatAmount } = useCurrency();
   const { colors, isDark } = useTheme();
+  const { user } = useAuthStore();
   
-  const { transactions, addTransaction, updateTransaction, deleteTransaction } = useTransactionStore();
+  const { transactions, addTransaction, updateTransaction, deleteTransaction, fetchTransactions } = useTransactionStore();
   
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
@@ -36,9 +38,17 @@ export default function TransactionsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
+    try {
+      if (user?.id) {
+        await fetchTransactions(parseInt(user.id));
+      }
+    } catch (error) {
+      console.error('Error refreshing:', error);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const filteredTransactions = useMemo(() => {
@@ -111,17 +121,33 @@ export default function TransactionsScreen() {
     trigger('light');
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     trigger('warning');
-    deleteTransaction(id);
+    await deleteTransaction(id);
+    // Refresh from backend to ensure sync
+    if (user?.id) {
+      await fetchTransactions(parseInt(user.id));
+    }
   };
 
-  const handleSave = (data: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const handleSave = async (data: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (editTransaction) {
-      updateTransaction(editTransaction.id, data);
+      await updateTransaction(editTransaction.id, data);
       setEditTransaction(undefined);
+      // Refresh from backend to ensure sync
+      if (user?.id) {
+        await fetchTransactions(parseInt(user.id));
+      }
     } else {
-      addTransaction(data);
+      // New transaction: persist to backend
+      if (user?.id) {
+        await addTransaction(data, parseInt(user.id));
+        // Refresh to ensure we have the authoritative list (optional because store prepends)
+        await fetchTransactions(parseInt(user.id));
+      } else {
+        // Fallback: add locally if no user
+        addTransaction(data as any, 1).catch((e) => console.error(e));
+      }
     }
     setModalVisible(false);
     trigger('success');

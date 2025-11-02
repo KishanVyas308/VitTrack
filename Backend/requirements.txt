@@ -5,3 +5,4 @@ groq
 sqlalchemy
 pydantic
 email-validator
+SQLAlchemy>=1.4

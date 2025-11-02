@@ -2,6 +2,9 @@ import { Audio } from 'expo-av';
 import { useCallback, useState } from 'react';
 import { CATEGORY_KEYWORDS } from '../constants/Categories';
 import { VoiceExpenseData } from '../types';
+import { buildUrl, API_ENDPOINTS } from '../config/api';
+import { useAuthStore } from '../store/authStore';
+import { useTransactionStore } from '../store/transactionStore';
 
 interface UseVoiceInputReturn {
   isRecording: boolean;
@@ -12,6 +15,7 @@ interface UseVoiceInputReturn {
   stopRecording: () => Promise<void>;
   reset: () => void;
   error: string | null;
+  processedExpenses: any[];
 }
 
 export const useVoiceInput = (): UseVoiceInputReturn => {
@@ -21,6 +25,10 @@ export const useVoiceInput = (): UseVoiceInputReturn => {
   const [parsedData, setparsedData] = useState<VoiceExpenseData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [processedExpenses, setProcessedExpenses] = useState<any[]>([]);
+  
+  const user = useAuthStore((state) => state.user);
+  const fetchTransactions = useTransactionStore((state) => state.fetchTransactions);
 
   const parseTranscription = useCallback((text: string): VoiceExpenseData => {
     const lowerText = text.toLowerCase();
@@ -122,27 +130,59 @@ export const useVoiceInput = (): UseVoiceInputReturn => {
       await recording.stopAndUnloadAsync();
       const uri = recording.getURI();
       
-      // For demo purposes, simulate transcription
-      // In production, you would send the audio to a speech-to-text service
-      // like Google Cloud Speech-to-Text, AWS Transcribe, or Azure Speech
-      
-      // Simulated transcription for demo
-      setTimeout(() => {
-        const mockTranscription = 'Spent 50 dollars on groceries';
-        setTranscription(mockTranscription);
-        
-        const parsed = parseTranscription(mockTranscription);
-        setparsedData(parsed);
-        setIsProcessing(false);
-      }, 1500);
+      if (!uri) {
+        throw new Error('No recording URI');
+      }
 
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Send audio to backend for processing
+      const formData = new FormData();
+      
+      // Create a file object from the audio URI
+      const audioFile = {
+        uri,
+        type: 'audio/wav',
+        name: 'recording.wav',
+      } as any;
+      
+      formData.append('file', audioFile);
+
+      const response = await fetch(
+        `${buildUrl(API_ENDPOINTS.PROCESS_AUDIO)}?user_id=${user.id}`,
+        {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'Accept': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to process audio');
+      }
+
+      const result = await response.json();
+      setProcessedExpenses(result.expense_ids || []);
+      setTranscription(result.message || 'Processing complete');
+      
+      // Refresh transactions to include new expenses
+      if (user.id) {
+        await fetchTransactions(parseInt(user.id));
+      }
+
+      setIsProcessing(false);
       setRecording(null);
     } catch (err) {
-      setError('Failed to process recording');
+      setError(err instanceof Error ? err.message : 'Failed to process recording');
       setIsProcessing(false);
       console.error('Processing error:', err);
     }
-  }, [recording, parseTranscription]);
+  }, [recording, user, fetchTransactions]);
 
   const reset = useCallback(() => {
     setIsRecording(false);
@@ -151,6 +191,7 @@ export const useVoiceInput = (): UseVoiceInputReturn => {
     setparsedData(null);
     setError(null);
     setRecording(null);
+    setProcessedExpenses([]);
   }, []);
 
   return {
@@ -161,6 +202,7 @@ export const useVoiceInput = (): UseVoiceInputReturn => {
     startRecording,
     stopRecording,
     reset,
+    processedExpenses,
     error,
   };
 };

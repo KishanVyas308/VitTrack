@@ -1,17 +1,17 @@
-from database import Base, engine, Column, Integer, String, DateTime, datetime
+from database import Base, engine
+from models import User, Category, Expense  # Import models to register them with Base
 from seed_categories import seed_categories
 
-# Create all tables
+# Drop all existing tables and recreate them (WARNING: This deletes all data!)
+print("Dropping existing tables...")
+Base.metadata.drop_all(bind=engine)
+
+# Create all tables with new schema
+print("Creating tables with new schema...")
 Base.metadata.create_all(bind=engine)
 
 # Seed categories
+print("Seeding categories...")
 seed_categories()
 
-class User(Base):
-    __tablename__ = "users"
-
-    id = Column(Integer, primary_key=True, index=True)
-    external_id = Column(String, unique=True, nullable=True)
-    name = Column(String)
-    email = Column(String, unique=True, index=True)
-    created_at = Column(DateTime, default=datetime.now)
+print("Database initialized successfully!")

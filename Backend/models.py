@@ -13,6 +13,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     name = Column(String)
     email = Column(String, unique=True, index=True)
+    password_hash = Column(String)  # Store hashed password
     created_at = Column(DateTime, default=datetime.datetime.now)
     expenses = relationship("Expense", back_populates="user")
 

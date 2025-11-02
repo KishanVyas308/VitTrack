@@ -38,10 +38,12 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
     stopRecording,
     reset,
     error,
+    processedExpenses,
   } = useVoiceInput();
 
   const [voiceState, setVoiceState] = useState<VoiceState>('initial');
   const [showSuccess, setShowSuccess] = useState(false);
+  const [hasAutoCompleted, setHasAutoCompleted] = useState(false);
 
   // Wave animations (20 bars)
   const waveAnimations = useRef(
@@ -64,6 +66,25 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
       setVoiceState('initial');
     }
   }, [isRecording, isProcessing, showSuccess]);
+
+  // Auto-close when processing completes and expenses are created
+  useEffect(() => {
+    if (!isProcessing && !isRecording && processedExpenses.length > 0 && !hasAutoCompleted) {
+      setHasAutoCompleted(true);
+      setShowSuccess(true);
+      
+      // Close modal after brief success display to trigger review modal
+      setTimeout(() => {
+        onClose();
+        // Don't reset immediately - let parent handle review modal first
+        setTimeout(() => {
+          setShowSuccess(false);
+          setHasAutoCompleted(false);
+          reset();
+        }, 500);
+      }, 1500);
+    }
+  }, [isProcessing, isRecording, processedExpenses, hasAutoCompleted, onClose, reset]);
 
   // Wave animations based on state
   useEffect(() => {
@@ -154,9 +175,10 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
   useEffect(() => {
     if (!visible) {
       setShowSuccess(false);
+      setHasAutoCompleted(false);
       reset();
     }
-  }, [visible]);
+  }, [visible, reset]);
 
   const handleMicPress = () => {
     trigger('medium');
@@ -167,23 +189,8 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
     }
   };
 
-  const handleSave = () => {
-    if (parsedData?.amount && parsedData?.categoryId) {
-      trigger('success');
-      setShowSuccess(true);
-      
-      // Auto close after showing success
-      setTimeout(() => {
-        onSave({
-          amount: parsedData.amount,
-          categoryId: parsedData.categoryId,
-          description: parsedData.description || '',
-          confidence: parsedData.confidence,
-        });
-        onClose();
-      }, 2500);
-    }
-  };
+  // Note: handleSave removed - expenses are created via backend /process_audio/
+  // and the review modal opens automatically after processing completes
 
   const handleClose = () => {
     trigger('light');
@@ -197,8 +204,8 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
         return {
           header: '#1e2139',
           subtitle: 'Listening to your transaction...',
-          waveColor: ['#8b5cf6', '#6366f1'],
-          buttonColor: ['#ef4444', '#dc2626'],
+          waveColor: ['#8b5cf6', '#6366f1'] as const,
+          buttonColor: ['#ef4444', '#dc2626'] as const,
           icon: 'mic-off',
           statusDot: '#ef4444',
           statusText: 'Recording',
@@ -207,8 +214,8 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
         return {
           header: '#1a1d29',
           subtitle: 'Processing your input...',
-          waveColor: ['#8b5cf6', '#a78bfa'],
-          buttonColor: ['#8b5cf6', '#6366f1'],
+          waveColor: ['#8b5cf6', '#a78bfa'] as const,
+          buttonColor: ['#8b5cf6', '#6366f1'] as const,
           icon: 'sparkles',
           statusDot: '#8b5cf6',
           statusText: 'Processing',
@@ -217,8 +224,8 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
         return {
           header: '#10b981',
           subtitle: 'Transaction saved successfully!',
-          waveColor: ['#10b981', '#14b8a6'],
-          buttonColor: ['#10b981', '#059669'],
+          waveColor: ['#10b981', '#14b8a6'] as const,
+          buttonColor: ['#10b981', '#059669'] as const,
           icon: 'checkmark-circle',
           statusDot: '#10b981',
           statusText: 'Completed',
@@ -227,8 +234,8 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
         return {
           header: '#1a1d29',
           subtitle: 'Speak naturally about your expense',
-          waveColor: ['#4a5568', '#6b7280'],
-          buttonColor: ['#8b5cf6', '#6366f1'],
+          waveColor: ['#4a5568', '#6b7280'] as const,
+          buttonColor: ['#8b5cf6', '#6366f1'] as const,
           icon: 'mic',
           statusDot: '#8b5cf6',
           statusText: 'Ready',
@@ -434,67 +441,31 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
               <View className="px-5 mb-6">
                 <View className="bg-[#252938] rounded-2xl p-6">
                   <Text className="text-white text-xl font-black text-center mb-2">
-                    Transaction Saved!
+                    Expenses Processed!
                   </Text>
                   <Text className="text-gray-400 text-sm font-medium text-center">
-                    Your expense has been recorded
+                    {processedExpenses.length > 0 
+                      ? `${processedExpenses.length} expense${processedExpenses.length > 1 ? 's' : ''} created successfully`
+                      : 'Your expenses have been recorded'
+                    }
+                  </Text>
+                  <Text className="text-gray-500 text-xs font-medium text-center mt-2">
+                    Opening review modal...
                   </Text>
                 </View>
               </View>
             )}
 
-            {/* Show parsed data if available */}
-            {parsedData && parsedData.amount && voiceState !== 'success' && (
+            {/* Show transcription if available during processing */}
+            {transcription && voiceState === 'processing' && (
               <View className="px-5 mb-6">
                 <View className="bg-[#252938] rounded-2xl p-5">
-                  <Text className="text-white text-lg font-bold text-center mb-4">
-                    Detected Information
+                  <Text className="text-white text-sm font-medium text-center mb-2">
+                    Transcribed:
                   </Text>
-                  
-                  {transcription && (
-                    <Text className="text-gray-400 text-sm italic text-center mb-4">
-                      "{transcription}"
-                    </Text>
-                  )}
-
-                  <View className="items-center gap-3">
-                    <View className="items-center">
-                      <Text className="text-gray-400 text-xs font-medium mb-1">Amount</Text>
-                      <Text className="text-purple-500 text-3xl font-black">
-                        ${parsedData.amount.toFixed(2)}
-                      </Text>
-                    </View>
-
-                    {parsedData.categoryId && (
-                      <View className="items-center">
-                        <Text className="text-gray-400 text-xs font-medium mb-1">Category</Text>
-                        <Text className="text-white text-base font-semibold">
-                          {parsedData.categoryId}
-                        </Text>
-                      </View>
-                    )}
-
-                    {parsedData.description && (
-                      <Text className="text-gray-400 text-sm text-center">
-                        {parsedData.description}
-                      </Text>
-                    )}
-                  </View>
-
-                  {/* Save Button */}
-                  <TouchableOpacity
-                    onPress={handleSave}
-                    className="mt-5 rounded-2xl overflow-hidden"
-                  >
-                    <LinearGradient
-                      colors={['#8b5cf6', '#6366f1']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      className="py-4 items-center"
-                    >
-                      <Text className="text-white text-base font-black">Save Transaction</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
+                  <Text className="text-gray-400 text-sm italic text-center">
+                    "{transcription}"
+                  </Text>
                 </View>
               </View>
             )}

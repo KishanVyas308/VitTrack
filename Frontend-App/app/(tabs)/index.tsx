@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useTheme } from '../../hooks/useTheme';
+import { useBackendSync } from '../../hooks/useBackendSync';
 import { useAuthStore } from '../../store/authStore';
 import { useTransactionStore } from '../../store/transactionStore';
 
@@ -24,13 +25,24 @@ export default function DashboardScreen() {
   const { formatAmount } = useCurrency();
   const { colors, isDark } = useTheme();
   const { user } = useAuthStore();
-  const { transactions } = useTransactionStore();
+  const { transactions, fetchTransactions } = useTransactionStore();
   const [refreshing, setRefreshing] = React.useState(false);
+  
+  // Sync data with backend on mount
+  useBackendSync();
 
-  const onRefresh = React.useCallback(() => {
+  const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1500);
-  }, []);
+    try {
+      if (user?.id) {
+        await fetchTransactions(parseInt(user.id));
+      }
+    } catch (error) {
+      console.error('Error refreshing:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [user, fetchTransactions]);
 
   const getGreeting = () => {
     const hour = new Date().getHours();

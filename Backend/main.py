@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 import logging
 from routes import expense
 from dotenv import load_dotenv
@@ -10,7 +11,16 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI()
+app = FastAPI(title="VitTrack Expense Tracker API", version="1.0.0")
+
+# Add CORS middleware to allow frontend connections
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, replace with specific origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(expense.router)
 
@@ -29,6 +39,16 @@ async def validation_exception_handler(request: Request, exc):
         content={"detail": "Validation error", "errors": error_details},
     )
 
-@app.post("/")
+@app.get("/")
 def read_root():
     return {"message": "Expense Tracker API"}
+
+if __name__ == "__main__":
+    import uvicorn
+    import os
+    
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", 8000))
+    
+    print(f"🚀 Starting server at http://{host}:{port}")
+    uvicorn.run("main:app", host=host, port=port, reload=True)
